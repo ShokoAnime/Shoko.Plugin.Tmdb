@@ -8,16 +8,32 @@
   "repository_url": "https://github.com/ShokoAnime/Shoko.Plugin.Tmdb",
   "tags": [
     "service-registration",
+    "metadata-provider",
     "metadata-auto-linker",
     "metadata-movie-linker",
     "metadata-series-linker",
     "suspension-provider",
-    "metadata-provider",
     "tmdb"
   ],
   "thumbnail_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/thumbnail.svg",
   "icon_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/icon.svg",
   "releases": [
+    {
+      "version": "1.2.1",
+      "tag": "v1.2.1",
+      "released_at": "2026-10-25T20:31:20.3954923Z",
+      "channel": "Stable",
+      "release_notes": "Built for the new server contract, with the plugin class now generated from the project. Works as before.\n\nRequires Shoko Server with abstractions \u00606.0.0-alpha.114\u0060.",
+      "dependencies": [],
+      "archives": [
+        {
+          "runtime": "any",
+          "abstraction": "6.0.0",
+          "url": "https://github.com/ShokoAnime/Shoko.Plugin.Tmdb/releases/download/v1.2.1/TMDB-v1.2.1-any.zip",
+          "checksum": "sha256:64ecf585a143ebee71d8f7824623d3ce36afd3625b2aba2099be051be8061c94"
+        }
+      ]
+    },
     {
       "version": "1.2.0",
       "tag": "v1.2.0",
