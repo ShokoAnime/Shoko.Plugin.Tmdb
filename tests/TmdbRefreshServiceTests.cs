@@ -295,6 +295,7 @@ public sealed class TmdbRefreshServiceTests : IDisposable
         Assert.Equal(new DateOnly(2025, 1, 10), movie.ReleaseDate);
         Assert.Equal(TimeSpan.FromMinutes(106), movie.Runtime);
         Assert.Equal(["JP", "US"], movie.ProductionCountries);
+        Assert.Equal("JP", movie.OriginalCountryCode);
         // Every certification of a country once, in TMDB's order.
         Assert.Equal([("US", "PG"), ("JP", "G"), ("JP", "PG12")], movie.ContentRatings.Select(rating => (rating.CountryCode, rating.Rating)));
         Assert.Equal(["imdb://movie/tt40000001"], movie.CrossSourceIDs.Select(id => id.ToString()));
@@ -320,6 +321,7 @@ public sealed class TmdbRefreshServiceTests : IDisposable
         var collection = _harness.StoreData.Collections[TmdbIds.Collection(8001)];
         Assert.Equal([TmdbIds.Movie(7001), TmdbIds.Movie(7002)], collection.Members);
         Assert.Equal("Journey's End Collection", collection.Titles[0].Value);
+        Assert.Contains(collection.Titles, title => title is { LanguageCode: "ja", Value: "旅の終わりコレクション" });
         Assert.Equal([(ImageEntityType.Primary, "collection-poster.jpg")], collection.DefaultImageResourceIDs!.Select(pair => (pair.Key, pair.Value)));
     }
 

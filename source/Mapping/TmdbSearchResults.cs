@@ -187,6 +187,7 @@ public static class TmdbSearchResults
             [
                 .. (movie.ReleaseDates?.Results ?? [])
                     .SelectMany(country => country.ReleaseDates ?? [])
+                    .Where(release => release.ReleaseDate != default)
                     .Select(release => DateOnly.FromDateTime(release.ReleaseDate))
                     .Distinct(),
             ],

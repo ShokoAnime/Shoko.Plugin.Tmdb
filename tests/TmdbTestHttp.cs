@@ -36,6 +36,8 @@ internal sealed class TmdbRoutes : HttpMessageHandler
 
     private readonly ConcurrentQueue<Uri> _requests = new();
 
+    private readonly ConcurrentBag<string> _hanging = [];
+
     /// <summary>
     ///   The paths asked for, after <c>/3/</c>, in order.
     /// </summary>
@@ -76,6 +78,17 @@ internal sealed class TmdbRoutes : HttpMessageHandler
     }
 
     /// <summary>
+    ///   Never answers a path, until the client gives up.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The routes.</returns>
+    public TmdbRoutes Hang(string path)
+    {
+        _hanging.Add(path);
+        return this;
+    }
+
+    /// <summary>
     ///   Answers a path with TMDB's error body.
     /// </summary>
     /// <param name="path">The path.</param>
@@ -98,6 +111,9 @@ internal sealed class TmdbRoutes : HttpMessageHandler
     {
         _requests.Enqueue(request.RequestUri!);
         var path = PathOf(request.RequestUri!);
+        if (_hanging.Contains(path))
+            return NeverAnswer(cancellationToken);
+
         if (!_routes.TryGetValue(path, out var answers) || answers.Count is 0)
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
             {
@@ -106,6 +122,12 @@ internal sealed class TmdbRoutes : HttpMessageHandler
 
         lock (answers)
             return Task.FromResult(answers.Count > 1 ? answers.Dequeue()() : answers.Peek()());
+    }
+
+    private static async Task<HttpResponseMessage> NeverAnswer(CancellationToken cancellationToken)
+    {
+        await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+        throw new InvalidOperationException("A request that never ends ended.");
     }
 
     private static string PathOf(Uri uri)
@@ -133,12 +155,19 @@ internal static class TmdbTestClient
     /// <param name="routes">The routes.</param>
     /// <param name="configuration">The configuration; one with an API key when left out.</param>
     /// <param name="timeProvider">The clock; the system's when left out.</param>
+    /// <param name="timeout">How long a request may take; TMDbLib's own when left out.</param>
     /// <returns>The client.</returns>
-    public static TmdbApiClient Create(TmdbRoutes routes, TmdbConfiguration? configuration = null, TimeProvider? timeProvider = null)
+    public static TmdbApiClient Create(TmdbRoutes routes, TmdbConfiguration? configuration = null, TimeProvider? timeProvider = null, TimeSpan? timeout = null)
         => new(
             Configuration(configuration ?? new() { UserApiKey = "test-key" }).Provider,
             NullLogger<TmdbApiClient>.Instance,
-            apiKey => (TMDbClient)_clientConstructor.Invoke([apiKey, true, "api.themoviedb.org", null, null, routes]),
+            apiKey =>
+            {
+                var client = (TMDbClient)_clientConstructor.Invoke([apiKey, true, "api.themoviedb.org", TmdbSerializer.Instance, null, routes]);
+                if (timeout is { } limit)
+                    client.Timeout = limit;
+                return client;
+            },
             timeProvider
         );
 

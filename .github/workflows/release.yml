@@ -43,6 +43,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          submodules: true
 
       # The image has no SDK. `global-json-file` rather than a literal
       # version, so this cannot drift from what a developer builds with.

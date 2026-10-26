@@ -92,7 +92,7 @@ public sealed class TmdbApiClient : IDisposable
         ISuspensionReporter<TmdbSuspensionProvider> suspensionReporter,
         TimeProvider? timeProvider = null
     )
-        : this(configurationProvider, logger, apiKey => new TMDbClient(apiKey), timeProvider, suspensionReporter)
+        : this(configurationProvider, logger, apiKey => new TMDbClient(apiKey, serializer: TmdbSerializer.Instance), timeProvider, suspensionReporter)
     {
     }
 
@@ -155,7 +155,7 @@ public sealed class TmdbApiClient : IDisposable
     /// <returns>What TMDB answered, or <c>null</c> when it has no such entry.</returns>
     /// <exception cref="MetadataProviderNotConfiguredException">No API key is available.</exception>
     /// <exception cref="RequestLimitExceededException">TMDB kept limiting the rate.</exception>
-    /// <exception cref="GeneralHttpException">TMDB answered with an error.</exception>
+    /// <exception cref="TMDbException">TMDB answered with an error.</exception>
     /// <exception cref="HttpRequestException">TMDB could not be reached.</exception>
     public async Task<T?> UseClient<T>(Func<TMDbClient, CancellationToken, Task<T?>> call, string displayName, CancellationToken cancellationToken = default)
         where T : class
@@ -178,7 +178,7 @@ public sealed class TmdbApiClient : IDisposable
                     _logger.LogTrace("Completed call: {DisplayName} ({Elapsed}ms)", displayName, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                     return result;
                 }
-                catch (NotFoundException)
+                catch (Exception ex) when (ex is NotFoundException or TMDbServerException { StatusMessage.Code: TMDbStatusCode.IdInvalid })
                 {
                     RateLimiter.NotifySuccess();
                     _logger.LogTrace("Completed call: {DisplayName} (not found)", displayName);
@@ -189,19 +189,18 @@ public sealed class TmdbApiClient : IDisposable
                     _logger.LogTrace("Hit the remote rate limit on {DisplayName}; retrying ({Attempt}).", displayName, rateLimited);
                     RateLimiter.NotifyRateLimitExceeded(ex.RetryAfter);
                 }
-                catch (HttpRequestException ex) when (ex.InnerException is TaskCanceledException && !cancellationToken.IsCancellationRequested && ++timedOut <= MaxTimeoutRetries)
+                catch (TaskCanceledException ex) when (IsTimeout(ex) && !cancellationToken.IsCancellationRequested && ++timedOut <= MaxTimeoutRetries)
                 {
                     _logger.LogTrace("Timed out on {DisplayName}; retrying ({Attempt}).", displayName, timedOut);
                 }
-                catch (GeneralHttpException ex)
+                catch (Exception ex) when (IsServerError(ex))
                 {
-                    if ((int)ex.HttpStatusCode >= 500)
-                        RateLimiter.NotifyServerError();
+                    RateLimiter.NotifyServerError();
                     throw;
                 }
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || IsTimeout(ex))
         {
             _logger.LogWarning(ex, "Failed call:    {DisplayName} ({Elapsed}ms)", displayName, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             throw;
@@ -211,6 +210,27 @@ public sealed class TmdbApiClient : IDisposable
             _bulkhead.Release();
         }
     }
+
+    /// <summary>
+    ///   Whether TMDB answered with a server error. TMDbLib reports most as
+    ///   its own exceptions, without the status code. TMDB's "invalid ID"
+    ///   answer is one of them, and is not counted: it is the caller's
+    ///   mistake, not an outage, and <see cref="UseClient"/> answers it like
+    ///   an entry TMDB lacks.
+    /// </summary>
+    /// <param name="exception">The failure.</param>
+    /// <returns><c>true</c> for a server error.</returns>
+    public static bool IsServerError(Exception exception)
+        => exception switch
+        {
+            GeneralHttpException http => (int)http.HttpStatusCode >= 500,
+            TMDbServiceUnavailableException => true,
+            TMDbServerException { StatusMessage: not { Code: TMDbStatusCode.IdInvalid } } => true,
+            _ => false,
+        };
+
+    private static bool IsTimeout(Exception exception)
+        => exception is TaskCanceledException { InnerException: TimeoutException };
 
     /// <summary>
     ///   Whether a failure is one a later attempt may get past: a network
@@ -223,8 +243,8 @@ public sealed class TmdbApiClient : IDisposable
         {
             AggregateException { InnerExceptions: [var inner] } => IsTransient(inner),
             HttpRequestException or RequestLimitExceededException => true,
-            GeneralHttpException http => (int)http.HttpStatusCode >= 500,
-            TaskCanceledException { InnerException: TimeoutException } => true,
+            _ when IsServerError(exception) => true,
+            _ when IsTimeout(exception) => true,
             _ => false,
         };
 
@@ -527,7 +547,7 @@ public sealed class TmdbApiClient : IDisposable
     /// <exception cref="HttpRequestException">TMDB answered nothing.</exception>
     public async Task<SearchContainer<SearchTv>> SearchShows(string query, int page, bool includeRestricted, int year, CancellationToken cancellationToken = default)
         => await UseClient(
-            (client, token) => client.SearchTvShowAsync(query, page, includeRestricted, year, token),
+            (client, token) => client.SearchTvShowAsync(query, page, includeRestricted, firstAirDateYear: year, cancellationToken: token),
             $"Search{(includeRestricted ? " all" : string.Empty)} shows for \"{query}\"{(year > 0 ? $" in {year}" : string.Empty)}, page {page}",
             cancellationToken
         ).ConfigureAwait(false) ?? throw new HttpRequestException(HttpRequestError.ConnectionError, "TMDB answered no search results.");

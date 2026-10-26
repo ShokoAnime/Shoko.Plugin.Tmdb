@@ -687,7 +687,7 @@ public sealed partial class TmdbSearchService
                 [
                     .. episodes.Select(episode => new MetadataSearchResultEpisode
                     {
-                        EpisodeNumber = (int)episode.EpisodeNumber,
+                        EpisodeNumber = episode.EpisodeNumber,
                         AiredAt = episode.AirDate is { } airedAt ? DateOnly.FromDateTime(airedAt) : null,
                         Title = episode.Name,
                     }),

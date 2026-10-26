@@ -55,7 +55,7 @@ public static class TmdbCredits
     /// <param name="languageCode">The movie's original language.</param>
     /// <returns>The credits, in TMDB's order.</returns>
     public static IReadOnlyList<MetadataCastData> MovieCast(IEnumerable<MovieCast>? cast, string? languageCode)
-        => [.. (cast ?? []).Where(credit => credit.Id > 0).OrderBy(credit => credit.Order).Select(credit => Cast(credit.Id, credit.Name, credit.Character, languageCode, null))];
+        => [.. (cast ?? []).Where(credit => credit.Id > 0).OrderBy(credit => credit.Order ?? 0).Select(credit => Cast(credit.Id, credit.Name, credit.Character, languageCode, null))];
 
     /// <summary>
     ///   An episode's or a movie's crew.

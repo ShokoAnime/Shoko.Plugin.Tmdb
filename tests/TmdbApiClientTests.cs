@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Shoko.Abstractions.Metadata.Providers;
 using Shoko.Plugin.Tmdb;
 using Shoko.Plugin.Tmdb.Api;
+using TMDbLib.Objects.Changes;
 using TMDbLib.Objects.Exceptions;
 using TMDbLib.Objects.TvShows;
 using Xunit;
@@ -57,9 +59,33 @@ public sealed class TmdbApiClientTests
         using var client = TmdbTestClient.Create(_routes);
 
         for (var attempt = 0; attempt < 3; attempt++)
-            await Assert.ThrowsAsync<GeneralHttpException>(() => client.GetShow(1001, TvShowMethods.Undefined, TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<TMDbServiceUnavailableException>(() => client.GetShow(1001, TvShowMethods.Undefined, TestContext.Current.CancellationToken));
 
         Assert.NotNull(client.RateLimiter.ServerErrorsUntil);
+    }
+
+    [Fact]
+    public async Task ARequestThatTimesOutIsTriedAgainAndThenThrown()
+    {
+        _routes.Hang("tv/1001");
+        using var client = TmdbTestClient.Create(_routes, timeout: TimeSpan.FromMilliseconds(20));
+
+        var exception = await Assert.ThrowsAsync<TaskCanceledException>(() => client.GetShow(1001, TvShowMethods.Undefined, TestContext.Current.CancellationToken));
+
+        Assert.True(TmdbApiClient.IsTransient(exception));
+        Assert.Equal(4, _routes.Count("tv/1001"));
+    }
+
+    [Fact]
+    public async Task AnInvalidIDIsAnEntryTMDBLacks()
+    {
+        _routes.Json("tv/1001", """{"success":false,"status_code":44,"status_message":"The ID is invalid."}""", HttpStatusCode.InternalServerError);
+        using var client = TmdbTestClient.Create(_routes);
+
+        for (var attempt = 0; attempt < 3; attempt++)
+            Assert.Null(await client.GetShow(1001, TvShowMethods.Undefined, TestContext.Current.CancellationToken));
+
+        Assert.Null(client.RateLimiter.ServerErrorsUntil);
     }
 
     [Fact]
@@ -100,4 +126,47 @@ public sealed class TmdbApiClientTests
     [InlineData(HttpStatusCode.Unauthorized, false)]
     public void OnlyServerErrorsArePassing(HttpStatusCode status, bool transient)
         => Assert.Equal(transient, TmdbApiClient.IsTransient(new GeneralHttpException(status)));
+
+    [Fact]
+    public void TheChangesAreReadFromEveryKindOfItem()
+    {
+        static object Json(string json)
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.Clone();
+        }
+
+        var changes = TmdbShowChanges.Parse(
+        [
+            new() { Key = "episode", Items = [new ChangeItemAdded { Value = Json("""{"season_number":1,"episode_number":3}""") }] },
+            new() { Key = "episode", Items = [new ChangeItemDeleted { OriginalValue = Json("""{"season_number":2,"episode_number":"4"}""") }] },
+            new() { Key = "season", Items = [new ChangeItemDestroyed { Value = Json("""{"season_number":3}""") }] },
+            new() { Key = "episode", Items = [new ChangeItemUpdated { Value = Json("""{"season_number":null,"episode_number":5}""") }] },
+            new() { Key = "name", Items = [new ChangeItemUpdated { Value = "Renamed" }] },
+        ]);
+
+        Assert.Equal([1, 2, 3], changes.SeasonNumbers.Order());
+        Assert.Equal([(1, 3), (2, 4)], changes.Episodes.Order());
+    }
+
+    [Fact]
+    public void AnInvalidIDIsNotAServerError()
+    {
+        var invalid = new TMDbServerException(new TMDbStatusMessage { StatusCode = (int)TMDbStatusCode.IdInvalid });
+
+        Assert.False(TmdbApiClient.IsServerError(invalid));
+        Assert.True(TmdbApiClient.IsServerError(new TMDbServerException(new TMDbStatusMessage { StatusCode = (int)TMDbStatusCode.InternalError })));
+    }
+
+    [Theory]
+    [InlineData(typeof(TMDbServiceUnavailableException), true)]
+    [InlineData(typeof(TMDbServerException), true)]
+    [InlineData(typeof(TMDbAuthenticationException), false)]
+    public void TMDbLibsOwnServerErrorsArePassingToo(Type exceptionType, bool transient)
+    {
+        var exception = (Exception)Activator.CreateInstance(exceptionType, [(TMDbStatusMessage?)null])!;
+
+        Assert.Equal(transient, TmdbApiClient.IsServerError(exception));
+        Assert.Equal(transient, TmdbApiClient.IsTransient(exception));
+    }
 }

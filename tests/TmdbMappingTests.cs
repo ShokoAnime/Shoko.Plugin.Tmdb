@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Moq;
@@ -6,6 +7,7 @@ using Shoko.Abstractions.Metadata.Enums;
 using Shoko.Abstractions.Metadata.Storage;
 using Shoko.Plugin.Tmdb.Mapping;
 using TMDbLib.Objects.General;
+using TMDbLib.Objects.Movies;
 using TMDbLib.Objects.People;
 using TMDbLib.Objects.TvShows;
 using Xunit;
@@ -278,6 +280,47 @@ public sealed class TmdbMappingTests
         Assert.Null(TmdbSiteUrls.ForEntry(Entry(TmdbIds.Episode(3002))));
         Assert.Null(TmdbSiteUrls.ForEntry(Entry(TmdbIds.OrderingGroup("5acf93efc3a368739a0000a9"))));
         Assert.Null(TmdbSiteUrls.ForEntry(Entry(new(MetadataSource.AniDB, MetadataEntityType.Series, "1"))));
+    }
+
+    [Fact]
+    public void AReleaseDateTMDbLibCouldNotReadIsNotADate()
+    {
+        var movie = new Movie
+        {
+            ReleaseDate = new DateTime(2025, 1, 2),
+            ProductionCountries = [new() { Iso_3166_1 = "JP" }],
+            ReleaseDates = new() { Results = [new() { Iso_3166_1 = "JP", ReleaseDates = [new() { Type = ReleaseDateType.Theatrical }] }] },
+        };
+
+        Assert.Equal(new DateTime(2025, 1, 2), TmdbEntityMapper.ReleaseDateOf(movie));
+    }
+
+    [Fact]
+    public void AMovieIsReleasedOnItsEarliestTheatricalReleaseWhateverTheOrder()
+    {
+        var movie = new Movie
+        {
+            ReleaseDate = new DateTime(2025, 7, 18),
+            ProductionCountries = [new() { Iso_3166_1 = "JP" }],
+            ReleaseDates = new()
+            {
+                Results =
+                [
+                    new()
+                    {
+                        Iso_3166_1 = "JP",
+                        ReleaseDates =
+                        [
+                            new() { Type = ReleaseDateType.TheatricalLimited, ReleaseDate = new DateTime(2026, 2, 6) },
+                            new() { Type = ReleaseDateType.Theatrical, ReleaseDate = new DateTime(2025, 7, 18) },
+                            new() { Type = ReleaseDateType.Theatrical, ReleaseDate = new DateTime(2026, 6, 12) },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        Assert.Equal(new DateTime(2025, 7, 18), TmdbEntityMapper.ReleaseDateOf(movie));
     }
 
     private static IMetadata Entry(MetadataGuid id)

@@ -6,5 +6,9 @@
 
         <!-- Used only without a checkout. -->
         <ShokoAbstractionsVersion>6.0.0-alpha.114</ShokoAbstractionsVersion>
+
+        <!-- A solution build otherwise builds TMDbLib, which it does not list,
+             as Debug. -->
+        <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
     </PropertyGroup>
 </Project>

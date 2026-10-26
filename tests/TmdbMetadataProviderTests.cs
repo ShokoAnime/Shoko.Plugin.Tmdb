@@ -97,6 +97,13 @@ public sealed class TmdbMetadataProviderTests : IDisposable
         Assert.Equal(TimeSpan.FromMinutes(3), unavailable?.RetryAfter);
     }
 
+    [Theory]
+    [InlineData(typeof(TMDbServiceUnavailableException), true)]
+    [InlineData(typeof(TMDbServerException), true)]
+    [InlineData(typeof(TMDbAuthenticationException), false)]
+    public void TMDbLibsOwnServerErrorsAreUnavailableToo(Type exceptionType, bool unavailable)
+        => Assert.Equal(unavailable, TmdbMetadataProvider.ToUnavailable((Exception)Activator.CreateInstance(exceptionType, [(TMDbStatusMessage?)null])!, null) is not null);
+
     #endregion
 
     #region Episodes

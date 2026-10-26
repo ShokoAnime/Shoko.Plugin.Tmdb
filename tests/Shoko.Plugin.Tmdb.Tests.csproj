@@ -32,9 +32,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- The plugin leaves the server's Newtonsoft.Json out of its output,
-             so the tests bring it. -->
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <Content Include="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

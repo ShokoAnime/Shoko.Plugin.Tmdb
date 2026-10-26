@@ -81,6 +81,10 @@ in the server's image settings, which wins over both.
 
 ## For developers
 
+TMDbLib is built from the submodule in `ext/TMDbLib`, so clone with
+`--recurse-submodules`, or run `git submodule update --init` in an existing
+clone.
+
 ```
 dotnet build Shoko.Plugin.Tmdb.slnx -c Release
 dotnet test Shoko.Plugin.Tmdb.slnx -c Release

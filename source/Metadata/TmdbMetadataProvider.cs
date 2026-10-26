@@ -358,8 +358,8 @@ public sealed class TmdbMetadataProvider :
             AggregateException { InnerExceptions: [MetadataProviderUnavailableException inner] } => inner,
             AggregateException { InnerExceptions: [var inner] } => ToUnavailable(inner, remainingPause),
             RequestLimitExceededException limited => new(MetadataSource.TMDB, "TMDB kept limiting the rate of requests.", limited.RetryAfter ?? remainingPause, exception),
-            GeneralHttpException { HttpStatusCode: >= HttpStatusCode.InternalServerError } http =>
-                new(MetadataSource.TMDB, $"TMDB answered with a server error ({(int)http.HttpStatusCode}).", remainingPause, exception),
+            _ when TmdbApiClient.IsServerError(exception) =>
+                new(MetadataSource.TMDB, exception is GeneralHttpException http ? $"TMDB answered with a server error ({(int)http.HttpStatusCode})." : "TMDB answered with a server error.", remainingPause, exception),
             HttpRequestException => new(MetadataSource.TMDB, "TMDB could not be reached.", remainingPause, exception),
             TaskCanceledException { InnerException: TimeoutException } => new(MetadataSource.TMDB, "TMDB did not answer in time.", remainingPause, exception),
             _ => null,

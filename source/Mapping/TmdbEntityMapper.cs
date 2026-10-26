@@ -7,6 +7,7 @@ using Shoko.Abstractions.Metadata.Enums;
 using Shoko.Abstractions.Metadata.Storage;
 using TMDbLib.Objects.Collections;
 using TMDbLib.Objects.General;
+using TMDbLib.Objects.General.Schema;
 using TMDbLib.Objects.Movies;
 using TMDbLib.Objects.People;
 using TMDbLib.Objects.Search;
@@ -51,7 +52,7 @@ public static class TmdbEntityMapper
             Restricted = show.Adult,
             ReleaseStatus = status,
             OriginalLanguageCode = TmdbTexts.Clean(show.OriginalLanguage),
-            OriginalCountryCode = (show.OriginCountry ?? []).Select(TmdbTexts.Clean).OfType<string>().FirstOrDefault()?.ToUpperInvariant(),
+            OriginalCountryCode = OriginalCountry(show.OriginCountry),
             ProductionCountries = CountryCodes(show.ProductionCountries),
             Popularity = show.Popularity > 0 ? show.Popularity : null,
             Resources = Homepage(show.Homepage),
@@ -103,7 +104,7 @@ public static class TmdbEntityMapper
             ID = TmdbIds.Episode(listed.Id),
             SeasonID = TmdbIds.Season(seasonID),
             SeasonNumber = listed.SeasonNumber,
-            EpisodeNumber = (int)listed.EpisodeNumber,
+            EpisodeNumber = listed.EpisodeNumber,
             Type = listed.SeasonNumber is 0 ? EpisodeType.Special : EpisodeType.Episode,
             Rating = listed.VoteAverage,
             RatingVotes = listed.VoteCount,
@@ -157,6 +158,7 @@ public static class TmdbEntityMapper
             Restricted = movie.Adult,
             Video = movie.Video,
             OriginalLanguageCode = TmdbTexts.Clean(movie.OriginalLanguage),
+            OriginalCountryCode = OriginalCountry(movie.OriginCountry),
             ProductionCountries = CountryCodes(movie.ProductionCountries),
             Rating = movie.VoteAverage,
             RatingVotes = movie.VoteCount,
@@ -173,9 +175,9 @@ public static class TmdbEntityMapper
     }
 
     /// <summary>
-    ///   When a movie was first released: its theatrical release, or its
-    ///   premiere, in the first country that made it, else the date TMDB
-    ///   gives the movie.
+    ///   When a movie was first released: its earliest theatrical release, or
+    ///   its earliest premiere, in the first country that made it, else the
+    ///   date TMDB gives the movie. TMDB lists the releases in no order of date.
     /// </summary>
     /// <param name="movie">The movie, with its release dates.</param>
     /// <returns>The date, or <c>null</c> when none is known.</returns>
@@ -185,9 +187,11 @@ public static class TmdbEntityMapper
         if (string.IsNullOrEmpty(country) || movie.ReleaseDates?.Results?.FirstOrDefault(result => result.Iso_3166_1 == country) is not { ReleaseDates: { } releases })
             return movie.ReleaseDate;
 
-        return releases.FirstOrDefault(release => release.Type is ReleaseDateType.TheatricalLimited or ReleaseDateType.Theatrical)?.ReleaseDate
-            ?? releases.FirstOrDefault(release => release.Type is ReleaseDateType.Premiere)?.ReleaseDate
-            ?? releases.FirstOrDefault()?.ReleaseDate
+        // TMDbLib reads a date it cannot parse as the default.
+        var dated = releases.Where(release => release.ReleaseDate != default).ToList();
+        return dated.Where(release => release.Type is ReleaseDateType.TheatricalLimited or ReleaseDateType.Theatrical).MinBy(release => release.ReleaseDate)?.ReleaseDate
+            ?? dated.Where(release => release.Type is ReleaseDateType.Premiere).MinBy(release => release.ReleaseDate)?.ReleaseDate
+            ?? dated.MinBy(release => release.ReleaseDate)?.ReleaseDate
             ?? movie.ReleaseDate;
     }
 
@@ -201,12 +205,12 @@ public static class TmdbEntityMapper
     {
         ArgumentNullException.ThrowIfNull(collection);
 
-        var english = TmdbTexts.English(collection.Translations, data => data.Name, collection.Name);
+        var english = TmdbTexts.English(collection.Translations, data => data.Name, collection.Name, collection.OriginalName, collection.OriginalLanguage);
         return new()
         {
             ID = TmdbIds.Collection(collection.Id),
-            Titles = TmdbTexts.Titles(english, null, null, collection.Translations, null, languages.SeriesTitles, ownName: collection.Name),
-            Overviews = TmdbTexts.Overviews(TmdbTexts.English(collection.Translations, data => data.Overview, collection.Overview), collection.Translations, languages.Overviews),
+            Titles = TmdbTexts.Titles(english, collection.OriginalName, collection.OriginalLanguage, collection.Translations, null, languages.SeriesTitles, ownName: collection.Name),
+            Overviews = TmdbTexts.Overviews(TmdbTexts.English(collection.Translations, data => data.Overview, collection.Overview, originalLanguageCode: collection.OriginalLanguage), collection.Translations, languages.Overviews),
             Members = [.. (collection.Parts ?? []).Where(part => part.Id > 0).Select(part => TmdbIds.Movie(part.Id)).Distinct()],
             DefaultImageResourceIDs = TmdbImages.Defaults((ImageEntityType.Primary, collection.PosterPath), (ImageEntityType.Backdrop, collection.BackdropPath)),
         };
@@ -411,19 +415,27 @@ public static class TmdbEntityMapper
     #region Helpers
 
     /// <summary>
+    ///   The country an entry originates from: the first TMDB lists.
+    /// </summary>
+    /// <param name="countries">The ISO codes of the countries.</param>
+    /// <returns>The code in upper case, or <c>null</c> when none is listed.</returns>
+    public static string? OriginalCountry(IEnumerable<string>? countries)
+        => (countries ?? []).Select(TmdbTexts.Clean).OfType<string>().FirstOrDefault()?.ToUpperInvariant();
+
+    /// <summary>
     ///   The IDs other sources gave an entry, as TMDB lists them.
     /// </summary>
     /// <param name="entityType">The entry's kind.</param>
     /// <param name="imdbID">The IMDb ID, if any.</param>
     /// <param name="tvdbID">The TvDB ID, if any.</param>
     /// <returns>The IDs, IMDb's first.</returns>
-    public static IReadOnlyList<MetadataGuid> CrossSourceIDs(MetadataEntityType entityType, string? imdbID, string? tvdbID)
+    public static IReadOnlyList<MetadataGuid> CrossSourceIDs(MetadataEntityType entityType, string? imdbID, int? tvdbID)
     {
         var ids = new List<MetadataGuid>();
         // Parsed on every call, so a source registered by a plugin later is still found.
         if (TmdbTexts.Clean(imdbID) is { } imdb && imdb.StartsWith("tt", StringComparison.Ordinal) && MetadataSource.TryParse("imdb", out var imdbSource))
             ids.Add(new(imdbSource, entityType, imdb));
-        if (int.TryParse(tvdbID, out var tvdb) && tvdb > 0 && MetadataSource.TryParse("tvdb", out var tvdbSource))
+        if (tvdbID is > 0 and var tvdb && MetadataSource.TryParse("tvdb", out var tvdbSource))
             ids.Add(new(tvdbSource, entityType, TmdbIds.Format(tvdb)));
         return ids;
     }
@@ -488,7 +500,7 @@ public static class TmdbEntityMapper
     /// </summary>
     /// <param name="results">The page.</param>
     /// <returns>The IDs.</returns>
-    public static IEnumerable<int> IDs(IEnumerable<SearchBase>? results)
+    public static IEnumerable<int> IDs(IEnumerable<TmdbEntity>? results)
         => (results ?? []).Select(result => result.Id);
 
     #endregion

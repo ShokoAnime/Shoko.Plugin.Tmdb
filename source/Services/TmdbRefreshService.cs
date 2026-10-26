@@ -121,7 +121,7 @@ public sealed class TmdbRefreshService(
             {
                 var episodeID = TmdbIds.Episode(listed.Id);
                 storedEpisodes.TryGetValue(episodeID, out var known);
-                if (known is not null && changes is not null && !changes.Episodes.Contains((listed.SeasonNumber, (int)listed.EpisodeNumber)))
+                if (known is not null && changes is not null && !changes.Episodes.Contains((listed.SeasonNumber, listed.EpisodeNumber)))
                 {
                     episodes.Add(CarryEpisode(known) with { SeasonID = seasonID });
                     credits.Add(new(seasonID, episodeID, null, null));
@@ -141,7 +141,7 @@ public sealed class TmdbRefreshService(
                 var episodeMethods = TvEpisodeMethods.ExternalIds | TvEpisodeMethods.Translations;
                 if (downloadCredits)
                     episodeMethods |= TvEpisodeMethods.Credits;
-                var details = await apiClient.GetEpisode(show.Id, listed.SeasonNumber, (int)listed.EpisodeNumber, episodeMethods, cancellationToken).ConfigureAwait(false);
+                var details = await apiClient.GetEpisode(show.Id, listed.SeasonNumber, listed.EpisodeNumber, episodeMethods, cancellationToken).ConfigureAwait(false);
                 episodes.Add(TmdbEntityMapper.ToEpisodeData(listedSeason.Id, listed, details, languages));
                 credits.Add(details?.Credits is { } episodeCredits && downloadCredits
                     ? new(
@@ -204,7 +204,9 @@ public sealed class TmdbRefreshService(
         {
             return await apiClient.GetShowChanges(showID, since, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (TmdbApiClient.IsTransient(ex))
+        // Any failure but a cancel, as the changes are an optimization: a
+        // change feed TMDbLib cannot read is no reason not to fetch the show.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Unable to ask TMDB what changed of show {ShowID}; fetching it whole.", showID);
             return null;
@@ -442,7 +444,7 @@ public sealed class TmdbRefreshService(
         {
             return await apiClient.HasMovieChanged(movieID, since, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (TmdbApiClient.IsTransient(ex))
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Unable to ask TMDB whether movie {MovieID} changed; fetching it whole.", movieID);
             return true;
