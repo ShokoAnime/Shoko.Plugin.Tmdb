@@ -1,6 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/ShokoAnime/ShokoServer/master/Shoko.BuildTools/manifest.schema.json",
-  "type": "package",
   "id": "85d0c34f-240f-4da3-8512-d0b45118a9f4",
   "name": "TMDB",
   "overview": "Supplies TMDB metadata for shows, movies, collections, people, studios and networks.",
@@ -18,6 +17,24 @@
   "thumbnail_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/thumbnail.svg",
   "icon_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/icon.svg",
   "releases": [
+    {
+      "version": "1.3.0",
+      "tag": "v1.3.0",
+      "released_at": "2026-11-15T14:48:15.8691735Z",
+      "channel": "Stable",
+      "release_notes": "- Trailers: links to the official trailers and teasers TMDB lists on YouTube, up to three per show, movie and episode, in your preferred languages first (\u0022Store Trailer Links From TMDB\u0022, on by default).\n- Characters: each cast credit now has its own character, keyed by TMDB\u0027s credit ID, so other plugins can link TMDB\u0027s cast to AniDB\u0027s characters. Existing entries get them on their next refresh.\n- Search marks adult shows as restricted.\n- Upgraded to TMDbLib 4.0.0, with TMDB\u0027s server and service-unavailable errors handled as before.\n\nRequires Shoko Server with abstractions \u00606.0.0-alpha.131\u0060.",
+      "dependencies": [],
+      "archives": [
+        {
+          "runtime": "any",
+          "abstraction": "6.0.0",
+          "url": "https://github.com/ShokoAnime/Shoko.Plugin.Tmdb/releases/download/v1.3.0/TMDB-v1.3.0-any.zip",
+          "checksum": "sha256:f99cdf4377794af0c73e3483f524e69997171335c928a66e6d9d4d4a62a09c40",
+          "packed_size": 620219,
+          "unpacked_size": 2165098
+        }
+      ]
+    },
     {
       "version": "1.2.1",
       "tag": "v1.2.1",
@@ -82,5 +99,6 @@
         }
       ]
     }
-  ]
+  ],
+  "type": "package"
 }
