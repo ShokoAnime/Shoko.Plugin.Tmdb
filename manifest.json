@@ -18,6 +18,24 @@
   "icon_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/icon.svg",
   "releases": [
     {
+      "version": "1.4.0",
+      "tag": "v1.4.0",
+      "released_at": "2026-11-15T15:16:49.8059279Z",
+      "channel": "Stable",
+      "release_notes": "- New settings \u0022Download Cast and Crew\u0022 and \u0022Download Networks\u0022, both on by default. Turned off, TMDB isn\u0027t asked for credits and a show\u0027s networks aren\u0027t kept, and what\u0027s stored goes at the next refresh.\n\nRequires Shoko Server with abstractions \u00606.0.0-alpha.131\u0060.",
+      "dependencies": [],
+      "archives": [
+        {
+          "runtime": "any",
+          "abstraction": "6.0.0",
+          "url": "https://github.com/ShokoAnime/Shoko.Plugin.Tmdb/releases/download/v1.4.0/TMDB-v1.4.0-any.zip",
+          "checksum": "sha256:7f132988beb4ab04cf46164aab0dea9011d84b0c81cd2815775ffe9e12ca1daa",
+          "packed_size": 620983,
+          "unpacked_size": 2167455
+        }
+      ]
+    },
+    {
       "version": "1.3.0",
       "tag": "v1.3.0",
       "released_at": "2026-11-15T14:48:15.8691735Z",
