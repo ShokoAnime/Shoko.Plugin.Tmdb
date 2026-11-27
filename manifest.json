@@ -18,6 +18,24 @@
   "icon_url": "https://raw.githubusercontent.com/ShokoAnime/Shoko.Plugin.Tmdb/stable/source/Assets/icon.svg",
   "releases": [
     {
+      "version": "1.4.1",
+      "tag": "v1.4.1",
+      "released_at": "2026-11-27T20:12:04.4811136Z",
+      "channel": "Stable",
+      "release_notes": "Built for the stable \u0060Shoko.Abstractions\u0060 \u00606.0.0\u0060 of Shoko Server 6.0.0. No other changes.\n\nRequires Shoko Server with \u0060Shoko.Abstractions\u0060 \u00606.0.0\u0060.",
+      "dependencies": [],
+      "archives": [
+        {
+          "runtime": "any",
+          "abstraction": "6.0.0",
+          "url": "https://github.com/ShokoAnime/Shoko.Plugin.Tmdb/releases/download/v1.4.1/TMDB-v1.4.1-any.zip",
+          "checksum": "sha256:e9b2524cb8349f336962f78c57d4b721166ed0ad0cc40951c372b9a0a10c0412",
+          "packed_size": 620968,
+          "unpacked_size": 2167451
+        }
+      ]
+    },
+    {
       "version": "1.4.0",
       "tag": "v1.4.0",
       "released_at": "2026-11-15T15:16:49.8059279Z",
