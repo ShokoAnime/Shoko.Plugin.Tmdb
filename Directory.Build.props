@@ -5,6 +5,6 @@
         <ShokoRepositoryPath Condition="'$(ShokoRepositoryPath)' == ''"></ShokoRepositoryPath>
 
         <!-- Used only without a checkout. -->
-        <ShokoAbstractionsVersion>6.0.0-alpha.131</ShokoAbstractionsVersion>
+        <ShokoAbstractionsVersion>6.0.0</ShokoAbstractionsVersion>
     </PropertyGroup>
 </Project>
